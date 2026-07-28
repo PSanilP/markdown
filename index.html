@@ -1,0 +1,842 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown to Rich Text Converter</title>
+    <link rel="shortcut icon" href="favicon.ico" />
+
+    <!-- marked.js library for robust markdown parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- turndown.js for converting edited rich text back into markdown -->
+    <script src="https://cdn.jsdelivr.net/npm/turndown/dist/turndown.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/turndown-plugin-gfm/dist/turndown-plugin-gfm.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #f4f4f5;
+            --pane-bg: #ffffff;
+            --border-color: #d4d4d8;
+            --header-bg: #e4e4e7;
+            --text-main: #18181b;
+            --text-muted: #71717a;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --dropzone-bg: #e0f2fe;
+            --dropzone-border: #38bdf8;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            height: 100vh;
+            box-sizing: border-box;
+            background-color: var(--bg-color);
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            width: 100%;
+            height: 100%;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            background: var(--pane-bg);
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+
+        .pane {
+            display: flex;
+            flex-direction: column;
+            min-width: 200px;
+            height: 100%;
+            position: relative;
+        }
+
+        #left-pane {
+            width: 50%;
+            transition: width 0.2s ease;
+        }
+
+        #right-pane {
+            flex: 1;
+        }
+
+        /* Full-width Edit Mode */
+        .container.edit-mode-active #left-pane,
+        .container.edit-mode-active #resizer {
+            display: none;
+        }
+
+        .edit-mode-label {
+            color: var(--accent);
+            font-weight: 700;
+        }
+
+        /* Resizer styles */
+        .resizer {
+            width: 6px;
+            background-color: var(--header-bg);
+            cursor: col-resize;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: background-color 0.2s;
+            border-left: 1px solid var(--border-color);
+            border-right: 1px solid var(--border-color);
+            z-index: 10;
+        }
+
+            .resizer:hover, .resizer:active {
+                background-color: #c4c4c8;
+            }
+
+            .resizer::after {
+                content: "⋮";
+                color: var(--text-muted);
+                font-size: 18px;
+            }
+
+        .pane-header {
+            background: var(--header-bg);
+            padding: 10px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .pane-title {
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text-main);
+        }
+
+        .pane-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .icon-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 6px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+            .icon-btn:hover {
+                background-color: rgba(0, 0, 0, 0.05);
+                color: var(--text-main);
+            }
+
+            .icon-btn svg {
+                width: 16px;
+                height: 16px;
+            }
+
+        textarea {
+            flex: 1;
+            resize: none;
+            padding: 20px;
+            font-family: "Consolas", "Monaco", monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            border: none;
+            outline: none;
+            color: var(--text-main);
+            background: transparent;
+        }
+
+        .output {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            color: var(--text-main);
+            line-height: 1.6;
+        }
+
+            /* Rich Text Styling constraints */
+            .output h1, .output h2, .output h3 {
+                margin-top: 0;
+                color: var(--text-main);
+            }
+
+            .output p {
+                margin-top: 0;
+                margin-bottom: 1em;
+            }
+
+            .output blockquote {
+                border-left: 4px solid var(--border-color);
+                margin: 0 0 1em 0;
+                padding-left: 1em;
+                color: #52525b;
+                font-style: italic;
+            }
+
+            .output table {
+                border-collapse: collapse;
+                width: 100%;
+                margin-bottom: 15px;
+            }
+
+            .output th, .output td {
+                border: 1px solid var(--border-color);
+                padding: 8px 12px;
+                text-align: left;
+            }
+
+            .output th {
+                background-color: var(--bg-color);
+            }
+
+            .output code {
+                background-color: var(--bg-color);
+                padding: 2px 4px;
+                border-radius: 4px;
+                font-family: monospace;
+                font-size: 0.9em;
+            }
+
+            .output pre {
+                background-color: var(--bg-color);
+                padding: 12px 14px;
+                border-radius: 6px;
+                overflow-x: auto;
+            }
+
+                .output pre code {
+                    background: none;
+                    padding: 0;
+                }
+
+        .icon-btn.active {
+            background-color: var(--accent);
+            color: #ffffff;
+        }
+
+        .output[contenteditable="true"] {
+            outline: none;
+            cursor: text;
+        }
+
+            .output[contenteditable="true"]:focus {
+                box-shadow: inset 0 0 0 2px var(--accent);
+                border-radius: 4px;
+            }
+
+        /* Formatting toolbar */
+        .toolbar {
+            display: none;
+            flex-wrap: wrap;
+            gap: 4px;
+            padding: 8px 12px;
+            background: var(--header-bg);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+            .toolbar.show {
+                display: flex;
+                align-items: center;
+            }
+
+            .toolbar button {
+                background: var(--pane-bg);
+                border: 1px solid var(--border-color);
+                color: var(--text-main);
+                font-size: 13px;
+                font-family: inherit;
+                min-width: 30px;
+                padding: 5px 8px;
+                border-radius: 5px;
+                cursor: pointer;
+                transition: all 0.15s;
+            }
+
+                .toolbar button:hover {
+                    background-color: var(--accent);
+                    border-color: var(--accent);
+                    color: #ffffff;
+                }
+
+                .toolbar button.active {
+                    background-color: var(--accent);
+                    border-color: var(--accent);
+                    color: #ffffff;
+                }
+
+        .toolbar-divider {
+            width: 1px;
+            background-color: var(--border-color);
+            margin: 2px 4px;
+            height: 24px;
+            align-self: center;
+        }
+
+        /* Custom Toast Notification */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: #27272a;
+            color: white;
+            padding: 10px 24px;
+            border-radius: 30px;
+            font-size: 14px;
+            font-weight: 500;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 100;
+        }
+
+            .toast.show {
+                opacity: 1;
+                visibility: visible;
+                transform: translateX(-50%) translateY(0);
+            }
+
+        /* Close Edit Button Styles */
+        #close-edit-btn {
+            border-color: transparent;
+            margin-left: auto;
+        }
+
+            #close-edit-btn:hover {
+                background-color: #e4e4e4;
+                border-color: #ef4444;
+                color: #ef4444;
+            }
+
+        /* Format Painter Custom Cursor */
+        .output.painting {
+            cursor: cell !important;
+        }
+
+        /* Drag and Drop Zone Overlay */
+        .dropzone-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s ease;
+        }
+
+            .dropzone-overlay.active {
+                opacity: 1;
+                visibility: visible;
+            }
+
+        .dropzone-content {
+            border: 2px dashed var(--border-color);
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            background-color: var(--pane-bg);
+            transition: all 0.2s;
+            pointer-events: none;
+        }
+
+        .dropzone-overlay.drag-over .dropzone-content {
+            border-color: var(--dropzone-border);
+            background-color: var(--dropzone-bg);
+            transform: scale(1.02);
+        }
+
+        .dropzone-icon {
+            color: var(--accent);
+            margin-bottom: 15px;
+        }
+
+        .dropzone-text {
+            color: var(--text-main);
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .dropzone-subtext {
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container" id="main-container">
+
+        <!-- Left Side: Raw Markdown Input -->
+        <div class="pane" id="left-pane">
+            <div class="pane-header">
+                <span class="pane-title">Markdown Input</span>
+                <div class="pane-actions">
+                    <button class="icon-btn" onclick="document.getElementById('file-input').click()" title="Open a .md or .txt file">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path></svg>
+                    </button>
+                    <input type="file" id="file-input" accept=".md,.txt,text/markdown,text/plain" style="display:none;">
+                    <button class="icon-btn" onclick="copyMarkdown()" title="Copy Markdown text">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    </button>
+                    <button class="icon-btn" onclick="pasteMarkdown()" title="Paste text into editor">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
+                    </button>
+                </div>
+            </div>
+            <textarea id="markdown-input" spellcheck="false"></textarea>
+
+            <!-- Drag and Drop Overlay for Left Pane -->
+            <div id="dropzone" class="dropzone-overlay">
+                <div class="dropzone-content">
+                    <svg class="dropzone-icon" xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                    <div class="dropzone-text">Drop Markdown File Here</div>
+                    <div class="dropzone-subtext">Supports .md and .txt</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Resizer Divider -->
+        <div class="resizer" id="resizer" title="Drag to resize panels"></div>
+
+        <!-- Right Side: Rich Text Rendered Output -->
+        <div class="pane" id="right-pane">
+            <div class="pane-header">
+                <span class="pane-title">Rich Text Output</span>
+                <div class="pane-actions">
+                    <button class="icon-btn" id="edit-toggle-btn" onclick="toggleEditMode()" title="Edit rich text visually">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path><path d="m15 5 4 4"></path></svg>
+                    </button>
+                    <button class="icon-btn" onclick="copyRichText()" title="Copy as Rich Text">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    </button>
+                    <button class="icon-btn" onclick="pasteMarkdown()" title="Paste text into editor">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
+                    </button>
+                </div>
+            </div>
+            <div class="toolbar" id="toolbar">
+                <button type="button" data-cmd="formatBlock" data-val="H1" title="Heading 1">H1</button>
+                <button type="button" data-cmd="formatBlock" data-val="H2" title="Heading 2">H2</button>
+                <button type="button" data-cmd="formatBlock" data-val="H3" title="Heading 3">H3</button>
+                <button type="button" data-cmd="formatBlock" data-val="P" title="Paragraph">¶</button>
+                <span class="toolbar-divider"></span>
+                <button type="button" data-cmd="bold" title="Bold"><b>B</b></button>
+                <button type="button" data-cmd="italic" title="Italic"><i>I</i></button>
+                <span class="toolbar-divider"></span>
+                <button type="button" data-cmd="insertUnorderedList" title="Bullet list">• List</button>
+                <button type="button" data-cmd="insertOrderedList" title="Numbered list">1. List</button>
+                <button type="button" data-cmd="formatBlock" data-val="BLOCKQUOTE" title="Quote">" "</button>
+                <span class="toolbar-divider"></span>
+                <button type="button" id="inline-code-btn" title="Inline code">&lt;/&gt;</button>
+                <button type="button" data-cmd="formatBlock" data-val="PRE" title="Code block">{ }</button>
+
+                <span class="toolbar-divider"></span>
+
+                <!-- Clear Formatting Button -->
+                <button type="button" id="clear-format-btn" title="Clear Formatting (Normal Text)">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="4 7 4 4 20 4 20 7"></polyline>
+                        <line x1="12" y1="4" x2="12" y2="20"></line>
+                        <line x1="17" y1="17" x2="23" y2="23"></line>
+                        <line x1="23" y1="17" x2="17" y2="23"></line>
+                    </svg>
+                </button>
+
+                <!-- Format Painter Button -->
+                <button type="button" id="format-painter-btn" title="Format Painter (Copies Block & Inline)">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <!-- Solid Handle -->
+                        <polygon points="15.5,3.2 20.8,7.1 18,10.8 12.7,6.9" />
+                        <!-- Solid Ferrule -->
+                        <polygon points="10.8,9.5 17.1,14.2 13.9,18.5 7.6,13.8" />
+                        <!-- Outlined Bristle Head -->
+                        <path d="M 6.8 14.8 L 12.3 18.9 L 11.6 19.8 C 9.5 22.6 6.8 21.8 3.5 17.5 C 3.1 17 3.5 16 4.3 16 C 5.3 16 6.1 15.5 6.8 14.8 Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+                    </svg>
+                </button>
+
+                <!-- Close Edit Mode Button -->
+                <button type="button" id="close-edit-btn" onclick="toggleEditMode()" title="Close Edit Mode">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                         stroke-linejoin="round">
+                        <line x1="20" y1="6" x2="6" y2="20"></line>
+                        <line x1="6" y1="6" x2="20" y2="20"></line>
+                    </svg>
+                </button>
+            </div>
+            <div id="rich-text-output" class="output"></div>
+        </div>
+
+    </div>
+
+    <div id="toast" class="toast">Action successful</div>
+
+    <script>
+        const input = document.getElementById('markdown-input');
+        const output = document.getElementById('rich-text-output');
+        const resizer = document.getElementById('resizer');
+        const leftPane = document.getElementById('left-pane');
+        const container = document.getElementById('main-container');
+        const toast = document.getElementById('toast');
+        let toastTimeout;
+
+        const exampleText = `# Down the Rabbit-Hole
+
+Alice was beginning to get very tired of sitting by her sister on the bank, and of having nothing to do: once or twice she had peeped into the book her sister was reading, but it had no pictures or conversations in it.
+
+> "And what is the use of a book," thought Alice, "without pictures or conversations?"
+
+## Curious Observations
+* The White Rabbit wore a **waistcoat**.
+* He took a watch out of his pocket and looked at it.
+* He actually *spoke* out loud!
+
+| Character | Species | Notable Traits |
+| :--- | :--- | :--- |
+| Alice | Human | Curious, polite |
+| White Rabbit | Rabbit | Anxious, constantly late |
+| Cheshire Cat | Feline | Grins, disappears |
+
+Here is a quick code thought Alice had: \`console.log("I'm late!");\``;
+
+        function updateOutput() {
+            output.innerHTML = marked.parse(input.value);
+        }
+
+        input.value = exampleText;
+        updateOutput();
+        input.addEventListener('input', updateOutput);
+
+        let isResizing = false;
+
+        resizer.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            document.body.style.cursor = 'col-resize';
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isResizing) return;
+            const containerRect = container.getBoundingClientRect();
+            const pointerRelativeXpos = e.clientX - containerRect.left;
+            const minWidth = 200;
+            if (pointerRelativeXpos > minWidth && pointerRelativeXpos < containerRect.width - minWidth) {
+                const newLeftWidth = (pointerRelativeXpos / containerRect.width) * 100;
+                leftPane.style.width = `${newLeftWidth}%`;
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isResizing) {
+                isResizing = false;
+                document.body.style.cursor = 'default';
+            }
+        });
+
+        function showToast(message) {
+            toast.textContent = message;
+            toast.classList.add('show');
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.remove('show');
+            }, 2500);
+        }
+
+        let editMode = false;
+        const toolbar = document.getElementById('toolbar');
+        const editToggleBtn = document.getElementById('edit-toggle-btn');
+        const rightPaneTitle = document.querySelector('#right-pane .pane-title');
+        const RIGHT_PANE_TITLE_DEFAULT = rightPaneTitle.textContent;
+
+        const turndownService = new TurndownService({
+            headingStyle: 'atx',
+            codeBlockStyle: 'fenced',
+            bulletListMarker: '*'
+        });
+        if (typeof turndownPluginGfm !== 'undefined') {
+            turndownService.use(turndownPluginGfm.gfm);
+        }
+
+        function toggleEditMode() {
+            editMode = !editMode;
+            output.contentEditable = editMode;
+            toolbar.classList.toggle('show', editMode);
+            editToggleBtn.classList.toggle('active', editMode);
+            container.classList.toggle('edit-mode-active', editMode);
+
+            if (editMode) {
+                rightPaneTitle.textContent = 'Edit Mode';
+                rightPaneTitle.classList.add('edit-mode-label');
+                output.focus();
+
+                // Cancel format painter if it was active
+                if (formatPainterActive) {
+                    formatPainterActive = false;
+                    formatPainterBtn.classList.remove('active');
+                    output.classList.remove('painting');
+                }
+
+                showToast("Visual editing on — use the toolbar to format.");
+            } else {
+                rightPaneTitle.textContent = RIGHT_PANE_TITLE_DEFAULT;
+                rightPaneTitle.classList.remove('edit-mode-label');
+                syncFromOutput();
+                updateOutput();
+                showToast("Visual editing off. Markdown updated.");
+            }
+        }
+
+        function syncFromOutput() {
+            const markdown = turndownService.turndown(output.innerHTML);
+            input.value = markdown;
+        }
+
+        output.addEventListener('input', () => {
+            if (editMode) syncFromOutput();
+        });
+
+        toolbar.addEventListener('mousedown', (e) => e.preventDefault());
+
+        toolbar.querySelectorAll('button[data-cmd]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                output.focus();
+                document.execCommand(btn.dataset.cmd, false, btn.dataset.val || null);
+                syncFromOutput();
+            });
+        });
+
+        document.getElementById('inline-code-btn').addEventListener('click', () => {
+            output.focus();
+            const selection = window.getSelection();
+            if (!selection.rangeCount || selection.isCollapsed) {
+                showToast("Select some text first to mark it as code.");
+                return;
+            }
+            const range = selection.getRangeAt(0);
+            const codeEl = document.createElement('code');
+            codeEl.appendChild(range.extractContents());
+            range.insertNode(codeEl);
+            selection.removeAllRanges();
+            syncFromOutput();
+        });
+
+        // --- Clear Formatting Logic ---
+        document.getElementById('clear-format-btn').addEventListener('click', () => {
+            output.focus();
+            document.execCommand('removeFormat', false, null);
+            document.execCommand('formatBlock', false, 'P');
+            syncFromOutput();
+            showToast("Formatting cleared to normal text.");
+        });
+
+        // --- Format Painter Logic ---
+        let formatPainterActive = false;
+        let copiedStyles = {
+            blockTag: null,
+            isBold: false,
+            isItalic: false
+        };
+        const formatPainterBtn = document.getElementById('format-painter-btn');
+
+        function getComputedStyles() {
+            let node = window.getSelection().anchorNode;
+            if (!node) return null;
+            if (node.nodeType === 3) node = node.parentNode;
+
+            const styles = { blockTag: 'P', isBold: false, isItalic: false };
+
+            // Check inline styles first using queryCommandState
+            styles.isBold = document.queryCommandState('bold');
+            styles.isItalic = document.queryCommandState('italic');
+
+            // Traverse up for block tag
+            let blockNode = node;
+            while (blockNode && blockNode !== output && blockNode.tagName !== 'DIV') {
+                const tag = blockNode.tagName.toUpperCase();
+                if (['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'BLOCKQUOTE', 'PRE'].includes(tag)) {
+                    styles.blockTag = tag;
+                    break;
+                }
+                blockNode = blockNode.parentNode;
+            }
+            return styles;
+        }
+
+        formatPainterBtn.addEventListener('click', () => {
+            if (formatPainterActive) {
+                formatPainterActive = false;
+                formatPainterBtn.classList.remove('active');
+                output.classList.remove('painting');
+                showToast("Format painter cancelled.");
+                return;
+            }
+
+            output.focus();
+            copiedStyles = getComputedStyles();
+
+            if (copiedStyles) {
+                formatPainterActive = true;
+                formatPainterBtn.classList.add('active');
+                output.classList.add('painting');
+
+                let msg = `Copied: ${copiedStyles.blockTag}`;
+                if (copiedStyles.isBold) msg += " + Bold";
+                if (copiedStyles.isItalic) msg += " + Italic";
+                showToast(msg + ". Click target to apply.");
+            }
+        });
+
+        output.addEventListener('click', (e) => {
+            if (formatPainterActive && editMode) {
+                setTimeout(() => {
+                    // Apply Block Format
+                    if (copiedStyles.blockTag) {
+                        document.execCommand('formatBlock', false, copiedStyles.blockTag);
+                    }
+
+                    // Apply Inline Formats
+                    const currentBold = document.queryCommandState('bold');
+                    const currentItalic = document.queryCommandState('italic');
+
+                    if (copiedStyles.isBold && !currentBold) document.execCommand('bold', false, null);
+                    if (!copiedStyles.isBold && currentBold) document.execCommand('bold', false, null);
+
+                    if (copiedStyles.isItalic && !currentItalic) document.execCommand('italic', false, null);
+                    if (!copiedStyles.isItalic && currentItalic) document.execCommand('italic', false, null);
+
+                    syncFromOutput();
+
+                    // Turn off painter
+                    formatPainterActive = false;
+                    formatPainterBtn.classList.remove('active');
+                    output.classList.remove('painting');
+                    showToast("Format applied!");
+                }, 10);
+            }
+        });
+
+        // --- Drag and Drop File Logic ---
+        const dropzone = document.getElementById('dropzone');
+
+        window.addEventListener('dragenter', (e) => {
+            e.preventDefault();
+            if (!editMode) {
+                dropzone.classList.add('active');
+            }
+        });
+
+        dropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropzone.classList.add('drag-over');
+        });
+
+        dropzone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('drag-over');
+
+            if (e.relatedTarget === null || !dropzone.contains(e.relatedTarget)) {
+                dropzone.classList.remove('active');
+            }
+        });
+
+        dropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('drag-over', 'active');
+
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                const file = e.dataTransfer.files[0];
+
+                if (!file.type.match('text.*') && !file.name.endsWith('.md')) {
+                    showToast("Please drop a valid .md or .txt file.");
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    input.value = event.target.result;
+                    updateOutput();
+                    showToast(`Loaded "${file.name}"`);
+                };
+                reader.onerror = () => {
+                    showToast(`Couldn't read "${file.name}"`);
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        document.getElementById('file-input').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                input.value = event.target.result;
+                updateOutput();
+                showToast(`Loaded "${file.name}"`);
+            };
+            reader.onerror = () => {
+                showToast(`Couldn't read "${file.name}"`);
+            };
+            reader.readAsText(file);
+
+            e.target.value = '';
+        });
+
+        function copyMarkdown() {
+            input.select();
+            document.execCommand('copy');
+            window.getSelection().removeAllRanges();
+            showToast("Markdown copied to clipboard!");
+        }
+
+        async function pasteMarkdown() {
+            try {
+                const text = await navigator.clipboard.readText();
+                const start = input.selectionStart;
+                const end = input.selectionEnd;
+                input.setRangeText(text, start, end, 'end');
+                updateOutput();
+                showToast("Text pasted into editor!");
+            } catch (err) {
+                showToast("Press Ctrl+V (or Cmd+V) to paste");
+                input.focus();
+            }
+        }
+
+        function copyRichText() {
+            const range = document.createRange();
+            range.selectNodeContents(output);
+
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+
+            try {
+                document.execCommand('copy');
+                showToast("Rich Text copied! Ready to paste into emails.");
+            } catch (e) {
+                showToast("Failed to copy. Try highlighting and Ctrl+C.");
+            }
+
+            selection.removeAllRanges();
+        }
+    </script>
+</body>
+</html>
