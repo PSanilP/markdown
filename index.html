@@ -11,8 +11,6 @@
     <!-- turndown.js for converting edited rich text back into markdown -->
     <script src="https://cdn.jsdelivr.net/npm/turndown/dist/turndown.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/turndown-plugin-gfm/dist/turndown-plugin-gfm.js"></script>
-    <!-- Phosphor Icons (web font) -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/regular/style.css">
 
     <style>
         :root {
@@ -143,11 +141,6 @@
             .icon-btn svg {
                 width: 16px;
                 height: 16px;
-            }
-
-            .icon-btn i.ph {
-                font-size: 18px;
-                line-height: 1;
             }
 
         textarea {
@@ -397,7 +390,7 @@
                 <span class="pane-title">Markdown Input</span>
                 <div class="pane-actions">
                     <button class="icon-btn" onclick="downloadMarkdown()" title="Download as draft.md">
-                        <i class="ph ph-file-md"></i>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path><path d="M12 11v6"></path><path d="m9 14 3 3 3-3"></path></svg>
                     </button>
                     <button class="icon-btn" onclick="document.getElementById('file-input').click()" title="Open a .md or .txt file">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path></svg>
@@ -432,10 +425,10 @@
                 <span class="pane-title">Rich Text Output</span>
                 <div class="pane-actions">
                     <button class="icon-btn" onclick="downloadHtml()" title="Download as draft.html">
-                        <i class="ph ph-file-html"></i>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path><path d="m10 13-2 2 2 2"></path><path d="m14 13 2 2-2 2"></path></svg>
                     </button>
                     <button class="icon-btn" onclick="downloadRtf()" title="Download as draft.rtf (Rich Text)">
-                        <i class="ph ph-file-doc"></i>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path><path d="M8 13h8"></path><path d="M8 17h8"></path><path d="M8 9h2"></path></svg>
                     </button>
                     <button class="icon-btn" id="edit-toggle-btn" onclick="toggleEditMode()" title="Edit rich text visually">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path><path d="m15 5 4 4"></path></svg>
