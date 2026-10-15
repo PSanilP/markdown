@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -11,6 +11,8 @@
     <!-- turndown.js for converting edited rich text back into markdown -->
     <script src="https://cdn.jsdelivr.net/npm/turndown/dist/turndown.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/turndown-plugin-gfm/dist/turndown-plugin-gfm.js"></script>
+    <!-- Phosphor Icons (web font) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/regular/style.css">
 
     <style>
         :root {
@@ -141,6 +143,11 @@
             .icon-btn svg {
                 width: 16px;
                 height: 16px;
+            }
+
+            .icon-btn i.ph {
+                font-size: 18px;
+                line-height: 1;
             }
 
         textarea {
@@ -389,6 +396,9 @@
             <div class="pane-header">
                 <span class="pane-title">Markdown Input</span>
                 <div class="pane-actions">
+                    <button class="icon-btn" onclick="downloadMarkdown()" title="Download as draft.md">
+                        <i class="ph ph-file-md"></i>
+                    </button>
                     <button class="icon-btn" onclick="document.getElementById('file-input').click()" title="Open a .md or .txt file">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path></svg>
                     </button>
@@ -421,6 +431,12 @@
             <div class="pane-header">
                 <span class="pane-title">Rich Text Output</span>
                 <div class="pane-actions">
+                    <button class="icon-btn" onclick="downloadHtml()" title="Download as draft.html">
+                        <i class="ph ph-file-html"></i>
+                    </button>
+                    <button class="icon-btn" onclick="downloadRtf()" title="Download as draft.rtf (Rich Text)">
+                        <i class="ph ph-file-doc"></i>
+                    </button>
                     <button class="icon-btn" id="edit-toggle-btn" onclick="toggleEditMode()" title="Edit rich text visually">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path><path d="m15 5 4 4"></path></svg>
                     </button>
@@ -818,6 +834,256 @@ Here is a quick code thought Alice had: \`console.log("I'm late!");\``;
                 showToast("Press Ctrl+V (or Cmd+V) to paste");
                 input.focus();
             }
+        }
+
+        // =====================================================
+        // Downloads: draft.md / draft.html / draft.rtf
+        // =====================================================
+        function downloadFile(filename, content, mime) {
+            const blob = new Blob([content], { type: mime });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+
+        function downloadMarkdown() {
+            if (editMode) syncFromOutput();
+            if (!input.value.trim()) { showToast("Nothing to download yet."); return; }
+            downloadFile('draft.md', input.value, 'text/markdown;charset=utf-8');
+            showToast("Downloaded draft.md");
+        }
+
+        function downloadHtml() {
+            if (!output.textContent.trim()) { showToast("Nothing to download yet."); return; }
+            const clone = output.cloneNode(true);
+            clone.removeAttribute('contenteditable');
+            const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>draft</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #18181b; line-height: 1.6; }
+  blockquote { border-left: 4px solid #d4d4d8; margin: 0 0 1em 0; padding-left: 1em; color: #52525b; font-style: italic; }
+  table { border-collapse: collapse; width: 100%; margin-bottom: 15px; }
+  th, td { border: 1px solid #d4d4d8; padding: 8px 12px; text-align: left; }
+  th { background: #f4f4f5; }
+  code { background: #f4f4f5; padding: 2px 4px; border-radius: 4px; font-family: Consolas, Monaco, monospace; font-size: 0.9em; }
+  pre { background: #f4f4f5; padding: 12px 14px; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+${clone.innerHTML}
+</body>
+</html>`;
+            downloadFile('draft.html', html, 'text/html;charset=utf-8');
+            showToast("Downloaded draft.html");
+        }
+
+        // ---- HTML DOM -> RTF converter ----
+        function rtfEsc(text, keepWhitespace) {
+            let r = '';
+            for (let i = 0; i < text.length; i++) {
+                const c = text.charCodeAt(i);
+                if (c === 92) r += '\\\\';
+                else if (c === 123) r += '\\{';
+                else if (c === 125) r += '\\}';
+                else if (c === 9 && keepWhitespace) r += '\\tab ';
+                else if (c === 10 || c === 13) r += keepWhitespace ? '' : ' ';
+                else if (c > 126) r += '\\u' + (c > 32767 ? c - 65536 : c) + '?';
+                else r += text[i];
+            }
+            return r;
+        }
+
+        const RTF_BLOCK_TAGS = ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'UL', 'OL', 'PRE', 'BLOCKQUOTE', 'TABLE', 'HR', 'DIV'];
+
+        function rtfInline(node, pre) {
+            let out = '';
+            node.childNodes.forEach((n) => {
+                if (n.nodeType === 3) {
+                    let t = n.nodeValue;
+                    if (!pre) t = t.replace(/\s+/g, ' ');
+                    out += rtfEsc(t, pre);
+                    return;
+                }
+                if (n.nodeType !== 1) return;
+                const tag = n.tagName.toLowerCase();
+                const inner = () => rtfInline(n, pre);
+                switch (tag) {
+                    case 'strong': case 'b': out += '{\\b ' + inner() + '}'; break;
+                    case 'em': case 'i': out += '{\\i ' + inner() + '}'; break;
+                    case 'u': out += '{\\ul ' + inner() + '}'; break;
+                    case 'del': case 's': case 'strike': out += '{\\strike ' + inner() + '}'; break;
+                    case 'code':
+                        out += pre ? inner() : '{\\f1\\fs20\\highlight2 ' + inner() + '}';
+                        break;
+                    case 'a': {
+                        const href = (n.getAttribute('href') || '').replace(/[\\{}]/g, '');
+                        out += href
+                            ? '{\\field{\\*\\fldinst{HYPERLINK "' + href + '"}}{\\fldrslt{\\cf3\\ul ' + inner() + '}}}'
+                            : inner();
+                        break;
+                    }
+                    case 'br': out += '\\line '; break;
+                    case 'img': out += rtfEsc('[' + (n.getAttribute('alt') || 'image') + ']'); break;
+                    case 'input':
+                        out += n.type === 'checkbox' ? (n.checked ? '\\u9745? ' : '\\u9744? ') : '';
+                        break;
+                    default: out += inner();
+                }
+            });
+            return out;
+        }
+
+        function rtfPara(content, ctx, extra) {
+            const indent = ctx.indent || 0;
+            let fmt = '\\pard\\plain\\f0\\fs22\\sa160\\sl276\\slmult1';
+            if (indent) fmt += '\\li' + indent;
+            if (ctx.quote) fmt += '\\brdrl\\brdrs\\brdrw20\\brsp140\\brdrcf1\\cf1\\i';
+            return '{' + fmt + (extra || '') + ' ' + content + '\\par}\r\n';
+        }
+
+        function rtfBlocks(container, ctx) {
+            let out = '';
+            let buffer = '';
+            const flush = () => {
+                if (buffer.trim()) out += rtfPara(buffer.trim(), ctx);
+                buffer = '';
+            };
+            container.childNodes.forEach((n) => {
+                if (n.nodeType === 1 && RTF_BLOCK_TAGS.includes(n.tagName)) {
+                    flush();
+                    out += rtfBlock(n, ctx);
+                } else if (n.nodeType === 3 || n.nodeType === 1) {
+                    const wrap = document.createElement('div');
+                    wrap.appendChild(n.cloneNode(true));
+                    buffer += rtfInline(wrap, false);
+                }
+            });
+            flush();
+            return out;
+        }
+
+        function rtfBlock(el, ctx) {
+            const tag = el.tagName;
+            const sizes = { H1: 40, H2: 34, H3: 28, H4: 24, H5: 22, H6: 20 };
+            if (sizes[tag]) {
+                return '{\\pard\\plain\\f0\\b\\fs' + sizes[tag] + '\\keepn\\sb240\\sa120' +
+                    (ctx.indent ? '\\li' + ctx.indent : '') + ' ' + rtfInline(el, false) + '\\par}\r\n';
+            }
+            switch (tag) {
+                case 'P': return rtfPara(rtfInline(el, false), ctx);
+                case 'DIV': return rtfBlocks(el, ctx);
+                case 'HR':
+                    return '{\\pard\\plain\\brdrb\\brdrs\\brdrw10\\brsp20\\sa160\\par}\r\n';
+                case 'BLOCKQUOTE':
+                    return rtfBlocks(el, { indent: (ctx.indent || 0) + 360, quote: true });
+                case 'PRE': {
+                    const lines = el.textContent.replace(/\n$/, '').split('\n')
+                        .map((l) => rtfEsc(l, true)).join('\\line ');
+                    return '{\\pard\\plain\\f1\\fs20\\cbpat2\\sa160' +
+                        (ctx.indent ? '\\li' + ctx.indent : '') + ' ' + lines + '\\par}\r\n';
+                }
+                case 'UL': case 'OL': return rtfList(el, ctx);
+                case 'TABLE': return rtfTable(el);
+            }
+            return '';
+        }
+
+        function rtfList(list, ctx) {
+            const ordered = list.tagName === 'OL';
+            let counter = parseInt(list.getAttribute('start') || '1', 10);
+            const base = (ctx.indent || 0);
+            const hang = 360;
+            let out = '';
+            Array.from(list.children).forEach((li) => {
+                if (li.tagName !== 'LI') return;
+                const marker = ordered ? (counter++) + '.' : '\\u8226?';
+                let first = true;
+                let buffer = '';
+                const emit = (content) => {
+                    const prefix = first ? marker + '\\tab ' : '';
+                    first = false;
+                    out += '{\\pard\\plain\\f0\\fs22\\sa60\\sl276\\slmult1\\li' + (base + hang) +
+                        '\\fi-' + hang + '\\tx' + (base + hang) + ' ' + prefix + content + '\\par}\r\n';
+                };
+                const flush = () => {
+                    if (buffer.trim()) emit(buffer.trim());
+                    buffer = '';
+                };
+                li.childNodes.forEach((n) => {
+                    if (n.nodeType === 1 && (n.tagName === 'UL' || n.tagName === 'OL')) {
+                        flush();
+                        if (first) emit('');
+                        out += rtfList(n, { indent: base + hang });
+                    } else if (n.nodeType === 1 && n.tagName === 'P') {
+                        flush();
+                        emit(rtfInline(n, false).trim());
+                    } else if (n.nodeType === 1 && RTF_BLOCK_TAGS.includes(n.tagName)) {
+                        flush();
+                        out += rtfBlock(n, { indent: base + hang });
+                    } else {
+                        const wrap = document.createElement('div');
+                        wrap.appendChild(n.cloneNode(true));
+                        buffer += rtfInline(wrap, false);
+                    }
+                });
+                flush();
+                if (first) emit('');
+            });
+            return out;
+        }
+
+        function rtfTable(table) {
+            const rows = Array.from(table.querySelectorAll('tr'));
+            if (!rows.length) return '';
+            const totalWidth = 9360;
+            let out = '';
+            rows.forEach((tr) => {
+                const cells = Array.from(tr.children).filter((c) => c.tagName === 'TD' || c.tagName === 'TH');
+                if (!cells.length) return;
+                const w = Math.floor(totalWidth / cells.length);
+                const border = '\\brdrs\\brdrw10\\brdrcf1';
+                let def = '\\trowd\\trgaph108\\trleft0';
+                cells.forEach((c, i) => {
+                    def += '\\clbrdrt' + border + '\\clbrdrl' + border + '\\clbrdrb' + border + '\\clbrdrr' + border;
+                    if (c.tagName === 'TH') def += '\\clcbpat2';
+                    def += '\\cellx' + (w * (i + 1));
+                });
+                out += def;
+                cells.forEach((c) => {
+                    const align = (c.getAttribute('align') || c.style.textAlign || 'left').toLowerCase();
+                    const q = align === 'center' ? '\\qc' : align === 'right' ? '\\qr' : '\\ql';
+                    const content = rtfInline(c, false).trim();
+                    out += '\\pard\\plain\\intbl\\f0\\fs22' + q + ' ' +
+                        (c.tagName === 'TH' ? '{\\b ' + content + '}' : content) + '\\cell ';
+                });
+                out += '\\row\r\n';
+            });
+            return out + '{\\pard\\plain\\sa120\\par}\r\n';
+        }
+
+        function buildRtf() {
+            const header = '{\\rtf1\\ansi\\ansicpg1252\\deff0\\uc1\r\n' +
+                '{\\fonttbl{\\f0\\fswiss\\fcharset0 Calibri;}{\\f1\\fmodern\\fcharset0 Courier New;}}\r\n' +
+                '{\\colortbl;\\red82\\green82\\blue91;\\red244\\green244\\blue245;\\red37\\green99\\blue235;}\r\n' +
+                '\\viewkind4\\f0\\fs22\r\n';
+            return header + rtfBlocks(output, { indent: 0 }) + '}';
+        }
+
+        function downloadRtf() {
+            if (!output.textContent.trim()) { showToast("Nothing to download yet."); return; }
+            downloadFile('draft.rtf', buildRtf(), 'application/rtf');
+            showToast("Downloaded draft.rtf");
         }
 
         function copyRichText() {
